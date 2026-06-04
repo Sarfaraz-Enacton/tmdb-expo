@@ -41,3 +41,12 @@ example
 # generated native folders
 /ios
 /android
+
+.env
+
+# all skills shoulb be ignored
+.agents/skills/
+.claude/skills/
+.kiro/skills/
+# heroui-agents-md
+.heroui-docs/
