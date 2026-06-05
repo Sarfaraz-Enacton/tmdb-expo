@@ -9,3 +9,4 @@
  *   - If global.css is in src/styles/: ../../node_modules/heroui-native/lib
  */
 @source './../../node_modules/heroui-native/lib';
+@source '../components';

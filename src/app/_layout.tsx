@@ -1,25 +1,42 @@
 import { Stack } from "expo-router";
 import { HeroUINativeProvider } from "heroui-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { QueryProvider } from "../providers/QueryProvider";
+import { AppLayout } from "../components/AppLayout";
+import "../i18n/index";
 import "./global.css";
 
 export default function RootLayout() {
   return (
-    <>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryProvider>
         <HeroUINativeProvider>
-          <Stack>
-            <Stack.Screen
-              name="index"
-              options={{ title: "Home", headerShown: false }}
-            />
-            <Stack.Screen
-              name="about"
-              options={{ title: "About", headerShown: false }}
-            />
-          </Stack>
+          <AppLayout>
+            <Stack>
+              <Stack.Screen
+                name="index"
+                options={{ title: "Explore", headerShown: false }}
+              />
+              <Stack.Screen
+                name="library"
+                options={{ title: "Library", headerShown: false }}
+              />
+              <Stack.Screen
+                name="expo"
+                options={{ title: "Expo Features", headerShown: false }}
+              />
+              <Stack.Screen
+                name="settings"
+                options={{ title: "Settings", headerShown: false }}
+              />
+              <Stack.Screen
+                name="movie/[id]"
+                options={{ title: "Movie Details", headerShown: false }}
+              />
+            </Stack>
+          </AppLayout>
         </HeroUINativeProvider>
-      </GestureHandlerRootView>
-    </>
+      </QueryProvider>
+    </GestureHandlerRootView>
   );
 }

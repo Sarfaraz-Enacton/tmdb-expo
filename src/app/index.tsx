@@ -1,123 +1,102 @@
-import { Image } from "expo-image";
+import { useQuery } from "@tanstack/react-query";
+import { router } from "expo-router";
 import {
-  Card,
-  Chip,
-  Dialog,
   Input,
   Spinner,
   Tabs,
   Typography,
 } from "heroui-native";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
 import {
-  getImageUrl,
   getPopularMovies,
   getTopRatedMovies,
   getTrendingMovies,
-  Movie,
   searchMovies,
 } from "../services/tmdb";
+import { useMovieStore } from "../stores/useMovieStore";
+import { MovieCard } from "../components/MovieCard";
 
 export default function Index() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<string>("trending");
   const [searchQuery, setSearchQuery] = useState<string>("");
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
 
-  // Debounced search / tab load effect
+  // Zustand state
+  const toggleFavorite = useMovieStore((state) => state.toggleFavorite);
+  const toggleWatchlist = useMovieStore((state) => state.toggleWatchlist);
+  const favorites = useMovieStore((state) => state.favorites);
+  const watchlist = useMovieStore((state) => state.watchlist);
+
+  // Debounce search input
   useEffect(() => {
-    let active = true;
+    const delayDebounceFn = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 400);
 
-    if (searchQuery.trim()) {
-      const delayDebounceFn = setTimeout(async () => {
-        setLoading(true);
-        try {
-          const results = await searchMovies(searchQuery);
-          if (active) {
-            setMovies(results);
-          }
-        } catch (error) {
-          console.error("Error searching movies:", error);
-        } finally {
-          if (active) setLoading(false);
-        }
-      }, 400);
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
 
-      return () => {
-        active = false;
-        clearTimeout(delayDebounceFn);
-      };
-    } else {
-      const loadMovies = async () => {
-        setLoading(true);
-        try {
-          let results: Movie[] = [];
-          if (activeTab === "trending") {
-            results = await getTrendingMovies();
-          } else if (activeTab === "popular") {
-            results = await getPopularMovies();
-          } else if (activeTab === "top_rated") {
-            results = await getTopRatedMovies();
-          }
-          if (active) {
-            setMovies(results);
-          }
-        } catch (error) {
-          console.error("Error loading tab movies:", error);
-        } finally {
-          if (active) setLoading(false);
-        }
-      };
-
-      loadMovies();
-
-      return () => {
-        active = false;
-      };
-    }
-  }, [searchQuery, activeTab]);
+  // React Query for movie fetching
+  const { data: movies = [], isLoading } = useQuery({
+    queryKey: debouncedSearch.trim()
+      ? ["movies", "search", debouncedSearch]
+      : ["movies", activeTab],
+    queryFn: () => {
+      if (debouncedSearch.trim()) {
+        return searchMovies(debouncedSearch);
+      }
+      if (activeTab === "trending") {
+        return getTrendingMovies();
+      }
+      if (activeTab === "popular") {
+        return getPopularMovies();
+      }
+      return getTopRatedMovies();
+    },
+  });
 
   return (
-    <SafeAreaView className="flex-1">
+    <SafeAreaView className="flex-1 bg-zinc-50">
       {/* Header Section */}
-      <View className="px-5 pt-4 pb-2 flex-row justify-between items-center">
-        <View className="flex-row items-center gap-2">
-          <Typography
-            type="h3"
-            weight="bold"
-            className="text-gray-800 text-2xl tracking-wide"
-          >
-            CineExplore
-          </Typography>
-        </View>
+      <View className="px-5 pt-4 pb-3 flex-row justify-between items-center bg-white border-b border-zinc-100 shadow-sm">
+        <Typography
+          type="h3"
+          weight="bold"
+          className="text-indigo-600 text-2xl tracking-tight"
+        >
+          {t("appName")}
+        </Typography>
       </View>
 
+      {/* Explore Screen Content */}
       {/* Search Bar Input */}
-      <View className="px-4 py-2">
+      <View className="px-4 py-2 bg-white">
         <Input
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Search movies..."
+          placeholder={t("searchPlaceholder")}
         />
       </View>
 
       {/* Categories Tabs Filter */}
       {!searchQuery && (
-        <View className="px-4 py-2 items-center">
+        <View className="px-4 py-2 items-center bg-white border-b border-zinc-100">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <Tabs.List className="text-sm">
               <Tabs.Indicator />
               <Tabs.Trigger value="trending">
-                <Tabs.Label>Trending</Tabs.Label>
+                <Tabs.Label>{t("trending")}</Tabs.Label>
               </Tabs.Trigger>
               <Tabs.Trigger value="popular">
-                <Tabs.Label>Popular</Tabs.Label>
+                <Tabs.Label>{t("popular")}</Tabs.Label>
               </Tabs.Trigger>
               <Tabs.Trigger value="top_rated">
-                <Tabs.Label>Top Rated</Tabs.Label>
+                <Tabs.Label>{t("topRated")}</Tabs.Label>
               </Tabs.Trigger>
             </Tabs.List>
           </Tabs>
@@ -125,124 +104,54 @@ export default function Index() {
       )}
 
       {/* Movie Content Area */}
-      <ScrollView contentContainerClassName="flex-grow pb-8">
-        {loading ? (
+      <ScrollView
+        className="flex-grow pb-8"
+        contentContainerClassName="flex-grow pb-40"
+      >
+        {isLoading ? (
           <View className="flex-1 items-center justify-center py-20">
             <Spinner size="lg" color="indigo" />
             <Typography type="body-sm" className="text-zinc-500 mt-4">
-              Fetching titles...
+              {t("fetchingTitles")}
             </Typography>
           </View>
         ) : movies.length === 0 ? (
           <View className="flex-1 items-center justify-center py-20 px-8">
             <Typography type="h5" weight="bold">
-              No Movies Found
+              {t("noMoviesFound")}
             </Typography>
-            <Typography type="body-sm" className="text-center">
-              Try searching for something else or check your network.
+            <Typography
+              type="body-sm"
+              className="text-center text-zinc-500 mt-1"
+            >
+              {t("noMoviesSub")}
             </Typography>
           </View>
         ) : (
-          // <View className="flex-row flex-wrap justify-between px-4 pt-4">
-          <View className="grid grid-cols-2 gap-4 px-4 py-2">
-            {movies.map((movie) => (
-              <Card
-                key={movie.id}
-                className="p-0 bg-zinc-100 border border-zinc-800/80 rounded-2xl overflow-hidden"
-                onPress={() => setSelectedMovie(movie)}
-              >
-                <Image
-                  source={{ uri: getImageUrl(movie.poster_path) }}
-                  className="w-full h-64 rounded-t-2xl"
-                  contentFit="cover"
-                  transition={250}
+          <View className="flex-row flex-wrap justify-between px-4 py-3">
+            {movies.map((movie) => {
+              const isFav = favorites.some((m) => m.id === movie.id);
+              const isWatch = watchlist.some((m) => m.id === movie.id);
+              return (
+                <MovieCard
+                  key={movie.id}
+                  movie={movie}
+                  isFav={isFav}
+                  isWatch={isWatch}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/movie/[id]",
+                      params: { id: movie.id },
+                    })
+                  }
+                  onFavoritePress={() => toggleFavorite(movie)}
+                  onWatchlistPress={() => toggleWatchlist(movie)}
                 />
-                <View className="p-3">
-                  <Typography type="body-xs" weight="semibold" truncate>
-                    {movie.title}
-                  </Typography>
-                  <View className="flex-row items-center justify-between mt-2 pt-2 border-t border-zinc-800/50">
-                    <Typography
-                      type="body-xs"
-                      className="text-zinc-500 text-xs"
-                    >
-                      {movie.release_date
-                        ? movie.release_date.split("-")[0]
-                        : "N/A"}
-                    </Typography>
-                    <Chip
-                      size="sm"
-                      color="warning"
-                      className="px-1.5 py-0.5 rounded-md"
-                    >
-                      <Chip.Label className="text-warning-800 font-bold text-[10px]">
-                        ★ {movie.vote_average.toFixed(1)}
-                      </Chip.Label>
-                    </Chip>
-                  </View>
-                </View>
-              </Card>
-            ))}
+              );
+            })}
           </View>
         )}
       </ScrollView>
-
-      {/* Movie Details Dialog popup */}
-      <Dialog
-        isOpen={selectedMovie !== null}
-        onOpenChange={(open) => !open && setSelectedMovie(null)}
-      >
-        <Dialog.Portal>
-          <Dialog.Overlay className="bg-black/80 absolute inset-0" />
-          <Dialog.Content className="bg-zinc-900 border border-zinc-800 rounded-3xl p-5 m-4 max-w-sm w-[90%] self-center shadow-2xl">
-            {selectedMovie && (
-              <View className="gap-4">
-                <Image
-                  source={{ uri: getImageUrl(selectedMovie.backdrop_path) }}
-                  className="w-full h-44 rounded-2xl"
-                  contentFit="cover"
-                  transition={250}
-                />
-
-                <View>
-                  <Dialog.Title className="text-white text-xl font-bold tracking-tight mb-1">
-                    {selectedMovie.title}
-                  </Dialog.Title>
-                  <View className="flex-row items-center gap-2 mb-2">
-                    <Typography type="body-xs" className="text-zinc-500">
-                      Release: {selectedMovie.release_date}
-                    </Typography>
-                    <Typography type="body-xs" className="text-zinc-500">
-                      •
-                    </Typography>
-                    <Chip
-                      size="sm"
-                      color="warning"
-                      className="px-2 py-0.5 rounded-md"
-                    >
-                      <Chip.Label className="text-warning-800 font-bold text-[10px]">
-                        ★ {selectedMovie.vote_average.toFixed(1)}
-                      </Chip.Label>
-                    </Chip>
-                  </View>
-                </View>
-
-                <Dialog.Description className="text-zinc-400 text-sm leading-relaxed max-h-48">
-                  {selectedMovie.overview}
-                </Dialog.Description>
-
-                <View className="pt-3 border-t border-zinc-800">
-                  <Dialog.Close className="w-full bg-zinc-800 active:bg-zinc-700 py-3 rounded-xl items-center justify-center">
-                    <Typography className="text-white text-sm font-semibold">
-                      Close
-                    </Typography>
-                  </Dialog.Close>
-                </View>
-              </View>
-            )}
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog>
     </SafeAreaView>
   );
 }
